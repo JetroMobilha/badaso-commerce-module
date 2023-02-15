@@ -1,6 +1,5 @@
 {
-  "version": "0.3.3",
-  "name": "badaso/commerce-module",
+  "name": "bamfura/conteudo-loja",
   "description": "e-commerce system for badaso",
   "keywords": [
     "laravel",
@@ -26,11 +25,12 @@
   },
   "authors": [
     {
-      "name": "UASOFT",
-      "email": "hello@uatech.co.id"
+      "name": "Bamfura",
+      "email": "geral@bamfura.com"
     }
   ],
-  "minimum-stability": "alpha",
+  "minimum-stability": "dev",
+  "prefer-stable": true,
   "autoload": {
     "psr-4": {
       "Uasoft\\Badaso\\Module\\Commerce\\": "src/"
@@ -52,7 +52,7 @@
   },
   "require-dev": {
     "phpstan/phpstan": "^1.4",
-    "badaso/core": "^2.4.10",
+    "bamfura/core": "*",
     "orchestra/testbench": "*"
   }
 }
