@@ -7,6 +7,7 @@ use Exception;
 use Illuminate\Http\Request;
 use Uasoft\Badaso\Controllers\Controller;
 use Uasoft\Badaso\Helpers\ApiResponse;
+use Uasoft\Badaso\Models\User;
 use Uasoft\Badaso\Models\UserRole;
 use Uasoft\Badaso\Module\Commerce\Events\OrderStateWasChanged;
 use Uasoft\Badaso\Module\Commerce\Models\Order;
@@ -22,22 +23,44 @@ class OrderController extends Controller
                 'page' => 'sometimes|required|integer',
                 'limit' => 'sometimes|required|integer',
                 'relation' => 'nullable',
+                'search' => 'nullable|string',
+                'order_field' => 'nullable|string',
+                'order_direction' => 'nullable|string|in:desc,asc',
             ]);
 
             $userId = auth()->user()->id;
             $userRole = UserRole::where('user_id', $userId)->get();
-            $roleId = null;
             foreach ($userRole as $key => $value) {
                 $roleId = $value->role_id;
             }
+            $search = $request->search;
+            $roleId = null;
             if ($roleId == 1) {
                 $orders = Order::when($request->relation, function ($query) use ($request) {
                     return $query->with(explode(',', $request->relation));
-                })->orderBy('id', 'desc')->paginate($request->limit ?? 10);
+                })
+                    ->when($search, function ($query, $search) {
+                        return $query->where('status', 'LIKE', '%'.$search.'%')
+                            ->orWhere('id', 'LIKE', '%'.$search.'%')
+                            ->orWhereHas('user', function ($q) use ($search) {
+                                $q->where('username', 'LIKE', '%'.$search.'%');
+                            });
+                    })
+                    ->orderBy($request->order_field ?? 'updated_at', $request->order_direction ?? 'desc')
+                    ->paginate($request->limit ?? 10);
             } else {
                 $orders = Order::when($request->relation, function ($query) use ($request) {
                     return $query->with(explode(',', $request->relation))->where('user_id', auth()->user()->id);
-                })->orderBy('id', 'desc')->paginate($request->limit ?? 10);
+                })
+                    ->where(function ($query) use ($search) {
+                        $query->where('status', 'like', '%'.$search.'%');
+                        $query->orWhere('id', 'like', '%'.$search.'%');
+                        $query->orWhereHas('user', function ($q) use ($search) {
+                            $q->where('username', 'like', '%'.$search.'%');
+                        });
+                    })
+                    ->orderBy($request->order_field ?? 'updated_at', $request->order_direction ?? 'desc')
+                    ->paginate($request->limit ?? 10);
             }
 
             $data['orders'] = $orders->toArray();
@@ -110,7 +133,7 @@ class OrderController extends Controller
                 $order->expired_at = null;
                 $order->save();
 
-                event(new OrderStateWasChanged(auth()->user(), $order, 'process'));
+                event(new OrderStateWasChanged(User::where('id', $order->user_id)->first(), $order, 'process'));
 
                 return ApiResponse::success();
             }
@@ -142,7 +165,7 @@ class OrderController extends Controller
                 $order->expired_at = null;
                 $order->save();
 
-                event(new OrderStateWasChanged(auth()->user(), $order, 'cancel'));
+                event(new OrderStateWasChanged(User::where('id', $order->user_id)->first(), $order, 'cancel'));
 
                 return ApiResponse::success();
             }
@@ -167,7 +190,7 @@ class OrderController extends Controller
                 $order->tracking_number = $request->tracking_number;
                 $order->save();
 
-                event(new OrderStateWasChanged(auth()->user(), $order, 'delivering'));
+                event(new OrderStateWasChanged(User::where('id', $order->user_id)->first(), $order, 'delivering'));
 
                 return ApiResponse::success();
             }
@@ -190,7 +213,7 @@ class OrderController extends Controller
                 $order->status = 'done';
                 $order->save();
 
-                event(new OrderStateWasChanged(auth()->user(), $order, 'done'));
+                event(new OrderStateWasChanged(User::where('id', $order->user_id)->first(), $order, 'done'));
 
                 return ApiResponse::success();
             }
